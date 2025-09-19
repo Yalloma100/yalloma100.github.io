@@ -6,27 +6,15 @@
     <meta name="theme-color" content="#2196F3">
     <title>Розклад уроків</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" type="image/png" href="icon.png">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f0f0f0; }
-        .container { text-align: center; padding: 20px; }
-        h1 { font-size: 2.5em; margin: 0; }
-        .burger { position: fixed; top: 10px; left: 10px; font-size: 30px; cursor: pointer; }
-        .menu { position: fixed; top: 0; left: -250px; width: 250px; height: 100%; background: #fff; transition: left 0.3s; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
-        .menu.open { left: 0; }
-        .menu ul { list-style: none; padding: 20px; margin: 0; }
-        .menu li { margin: 10px 0; }
-        .menu a { text-decoration: none; color: #2196F3; font-size: 1.2em; }
-        .join-btn { margin: 20px; padding: 10px 20px; font-size: 1.2em; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .info { font-size: 1.2em; margin: 10px 0; }
-        .schedule { margin: 20px; padding: 10px; background: white; border-radius: 5px; }
-        .schedule h3 { margin: 10px 0; }
-        .schedule-item { margin: 5px 0; }
-        select, input, button { padding: 5px; margin: 5px; }
-        .hidden { display: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Оверлей для затемнення фону при відкритому меню/модальному вікні -->
+    <div id="overlay" class="hidden"></div>
+
+    <!-- Бічне меню -->
     <div class="burger">☰</div>
     <div class="menu" id="menu">
         <ul>
@@ -36,22 +24,27 @@
             <li><a href="#" onclick="showSection('settings')">Налаштування</a></li>
         </ul>
     </div>
+
+    <!-- Основні секції -->
     <div class="container" id="current">
         <h1 id="currentLesson">Завантаження...</h1>
         <p id="timeInfo"></p>
         <p id="prevLesson" class="info"></p>
         <p id="nextLesson" class="info"></p>
-        <button class="join-btn" id="joinBtn" onclick="joinLesson()">Приєднатись</button>
+        <button class="join-btn hidden" id="joinBtn">Приєднатись</button>
     </div>
+
     <div class="container hidden" id="week">
         <h2>Розклад на тиждень</h2>
         <div id="weekSchedule"></div>
     </div>
+
     <div class="container hidden" id="all">
         <h2>Весь розклад</h2>
         <div id="allSchedules"></div>
         <button onclick="addNewSchedule()">Додати новий розклад</button>
     </div>
+
     <div class="container hidden" id="settings">
         <h2>Налаштування</h2>
         <h3>Налаштування уроків</h3>
@@ -65,256 +58,29 @@
         <h3>Експорт/Імпорт</h3>
         <button onclick="exportAllSchedules()">Експортувати всі</button>
         <button onclick="exportSelectedSchedule()">Експортувати вибраний</button>
-        <input type="file" id="importFile" accept=".txt">
+        <input type="file" id="importFile" accept=".json">
         <button onclick="importSchedule()">Імпортувати</button>
     </div>
-    <script>
-        let schedules = JSON.parse(localStorage.getItem('schedules')) || [];
-        let subjects = JSON.parse(localStorage.getItem('subjects')) || [];
-        let currentScheduleIndex = parseInt(localStorage.getItem('currentScheduleIndex')) || 0;
-        let oneTimeSchedule = JSON.parse(localStorage.getItem('oneTimeSchedule')) || null;
-        let settings = JSON.parse(localStorage.getItem('settings')) || { defaultDuration: 80, defaultPairs: 5 };
 
-        function saveData() {
-            localStorage.setItem('schedules', JSON.stringify(schedules));
-            localStorage.setItem('subjects', JSON.stringify(subjects));
-            localStorage.setItem('settings', JSON.stringify(settings));
-            localStorage.setItem('currentScheduleIndex', currentScheduleIndex);
-            localStorage.setItem('oneTimeSchedule', JSON.stringify(oneTimeSchedule));
-        }
+    <!-- Модальне вікно для додавання/редагування уроку -->
+    <div id="lessonModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3 id="modalTitle">Додати урок</h3>
+            <form id="lessonForm">
+                <label for="lessonSubject">Предмет:</label>
+                <select id="lessonSubject" required></select>
+                <label for="lessonStartTime">Час початку:</label>
+                <input type="time" id="lessonStartTime" required>
+                <label for="lessonDuration">Тривалість (хв):</label>
+                <input type="number" id="lessonDuration" required>
+                <label for="lessonLink">Посилання:</label>
+                <input type="text" id="lessonLink" placeholder="Автоматично з предмету" readonly>
+                <button type="submit">Зберегти</button>
+            </form>
+        </div>
+    </div>
 
-        function toggleMenu() {
-            document.getElementById('menu').classList.toggle('open');
-        }
-
-        function showSection(sectionId) {
-            document.querySelectorAll('.container').forEach(c => c.classList.add('hidden'));
-            document.getElementById(sectionId).classList.remove('hidden');
-            toggleMenu();
-            if (sectionId === 'week') renderWeekSchedule();
-            if (sectionId === 'all') renderAllSchedules();
-            if (sectionId === 'settings') renderSettings();
-        }
-
-        function getCurrentSchedule() {
-            const now = new Date();
-            const weekNumber = Math.floor((now.getTime() / (1000 * 60 * 60 * 24 * 7)) % schedules.length);
-            return oneTimeSchedule || schedules[currentScheduleIndex] || schedules[weekNumber] || { days: {} };
-        }
-
-        function calculateLessonStatus() {
-            const now = new Date();
-            const day = now.toLocaleString('uk', { weekday: 'long' }).toLowerCase();
-            const schedule = getCurrentSchedule();
-            const lessons = schedule.days[day] || [];
-            let currentLesson = null, prevLesson = null, nextLesson = null;
-
-            lessons.forEach((lesson, i) => {
-                const start = new Date();
-                const [hours, minutes] = lesson.startTime.split(':').map(Number);
-                start.setHours(hours, minutes, 0);
-                const end = new Date(start.getTime() + lesson.duration * 60 * 1000);
-
-                if (now >= start && now <= end) currentLesson = { ...lesson, index: i };
-                if (now > end && (!prevLesson || end > new Date(prevLesson.endTime))) prevLesson = { ...lesson, endTime: end };
-                if (now < start && (!nextLesson || start < new Date(nextLesson.startTime))) nextLesson = { ...lesson, startTime };
-            });
-
-            updateUI(currentLesson, prevLesson, nextLesson);
-        }
-
-        function updateUI(currentLesson, prevLesson, nextLesson) {
-            const now = new Date();
-            if (currentLesson) {
-                const end = new Date();
-                const [hours, minutes] = currentLesson.startTime.split(':').map(Number);
-                end.setHours(hours, minutes, 0);
-                end.setTime(end.getTime() + currentLesson.duration * 60 * 1000);
-                const timeLeft = Math.floor((end - now) / (60 * 1000));
-                document.getElementById('currentLesson').textContent = currentLesson.name;
-                document.getElementById('timeInfo').textContent = `До кінця: ${timeLeft} хв. Початок: ${currentLesson.startTime}`;
-                document.getElementById('joinBtn').onclick = () => window.open(currentLesson.link, '_blank');
-            } else {
-                document.getElementById('currentLesson').textContent = 'Перерва';
-                document.getElementById('timeInfo').textContent = nextLesson ? `Наступний урок через ${Math.floor((new Date(`${now.toDateString()} ${nextLesson.startTime}`) - now) / (60 * 1000))} хв.` : 'Сьогодні уроків немає';
-                document.getElementById('joinBtn').style.display = 'none';
-            }
-            document.getElementById('prevLesson').textContent = prevLesson ? `Попередній: ${prevLesson.name} (закінчився о ${new Date(prevLesson.endTime).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })})` : '';
-            document.getElementById('nextLesson').textContent = nextLesson ? `Наступний: ${nextLesson.name} (початок о ${nextLesson.startTime})` : '';
-        }
-
-        function renderWeekSchedule() {
-            const schedule = getCurrentSchedule();
-            const div = document.getElementById('weekSchedule');
-            div.innerHTML = '';
-            ['понеділок', 'вівторок', 'середа', 'четвер', 'п’ятниця', 'субота', 'неділя'].forEach(day => {
-                const lessons = schedule.days[day] || [];
-                div.innerHTML += `<h3>${day.charAt(0).toUpperCase() + day.slice(1)}</h3>`;
-                lessons.forEach((lesson, i) => {
-                    div.innerHTML += `<div class="schedule-item">${lesson.name} (${lesson.startTime}, ${lesson.duration} хв) <button onclick="editLesson('${day}', ${i})">Редагувати</button></div>`;
-                });
-                div.innerHTML += `<button onclick="addLesson('${day}')">Додати урок</button>`;
-            });
-        }
-
-        function renderAllSchedules() {
-            const div = document.getElementById('allSchedules');
-            div.innerHTML = '';
-            schedules.forEach((schedule, i) => {
-                div.innerHTML += `<div><h3>Розклад ${i + 1} <button onclick="moveSchedule(${i}, -1)">↑</button> <button onclick="moveSchedule(${i}, 1)">↓</button> <button onclick="applyOneTime(${i})">Одноразово</button> <button onclick="deleteSchedule(${i})">Видалити</button></h3>`;
-                ['понеділок', 'вівторок', 'середа', 'четвер', 'п’ятниця', 'субота', 'неділя'].forEach(day => {
-                    const lessons = schedule.days[day] || [];
-                    div.innerHTML += `<div>${day.charAt(0).toUpperCase() + day.slice(1)}: ${lessons.map(l => l.name).join(', ')}</div>`;
-                });
-                div.innerHTML += `</div>`;
-            });
-        }
-
-        function addNewSchedule() {
-            schedules.push({ days: {} });
-            saveData();
-            renderAllSchedules();
-        }
-
-        function moveSchedule(index, direction) {
-            const newIndex = index + direction;
-            if (newIndex >= 0 && newIndex < schedules.length) {
-                [schedules[index], schedules[newIndex]] = [schedules[newIndex], schedules[index]];
-                saveData();
-                renderAllSchedules();
-            }
-        }
-
-        function applyOneTime(index) {
-            oneTimeSchedule = schedules[index];
-            saveData();
-            alert('Розклад застосовано одноразово');
-        }
-
-        function deleteSchedule(index) {
-            if (confirm('Видалити розклад?')) {
-                schedules.splice(index, 1);
-                if (currentScheduleIndex >= schedules.length) currentScheduleIndex = 0;
-                saveData();
-                renderAllSchedules();
-            }
-        }
-
-        function addLesson(day) {
-            const schedule = getCurrentSchedule();
-            if (!schedule.days[day]) schedule.days[day] = [];
-            const startTime = prompt('Час початку (HH:MM):', '08:00') || '08:00';
-            const subject = prompt('Оберіть предмет або введіть новий:', '');
-            let link = subjects.find(s => s.name === subject)?.link || prompt('Посилання:', '');
-            const duration = parseInt(prompt('Тривалість (хв):', settings.defaultDuration)) || settings.defaultDuration;
-            schedule.days[day].push({ name: subject, startTime, duration, link });
-            if (!subjects.find(s => s.name === subject)) subjects.push({ name: subject, link });
-            saveData();
-            renderWeekSchedule();
-        }
-
-        function editLesson(day, index) {
-            const schedule = getCurrentSchedule();
-            const lesson = schedule.days[day][index];
-            const startTime = prompt('Час початку (HH:MM):', lesson.startTime) || lesson.startTime;
-            const subject = prompt('Предмет:', lesson.name) || lesson.name;
-            const link = prompt('Посилання:', lesson.link) || lesson.link;
-            const duration = parseInt(prompt('Тривалість (хв):', lesson.duration)) || lesson.duration;
-            schedule.days[day][index] = { name: subject, startTime, duration, link };
-            if (!subjects.find(s => s.name === subject)) subjects.push({ name: subject, link });
-            saveData();
-            renderWeekSchedule();
-        }
-
-        function renderSettings() {
-            document.getElementById('defaultDuration').value = settings.defaultDuration;
-            document.getElementById('defaultPairs').value = settings.defaultPairs;
-            const div = document.getElementById('subjectsList');
-            div.innerHTML = '';
-            subjects.forEach((subject, i) => {
-                div.innerHTML += `<div>${subject.name} (${subject.link}) <button onclick="editSubject(${i})">Редагувати</button> <button onclick="deleteSubject(${i})">Видалити</button></div>`;
-            });
-        }
-
-        function addSubject() {
-            const name = document.getElementById('newSubject').value;
-            const link = document.getElementById('newSubjectLink').value;
-            if (name && link) {
-                subjects.push({ name, link });
-                document.getElementById('newSubject').value = '';
-                document.getElementById('newSubjectLink').value = '';
-                saveData();
-                renderSettings();
-            }
-        }
-
-        function editSubject(index) {
-            const name = prompt('Назва предмету:', subjects[index].name) || subjects[index].name;
-            const link = prompt('Посилання:', subjects[index].link) || subjects[index].link;
-            subjects[index] = { name, link };
-            saveData();
-            renderSettings();
-        }
-
-        function deleteSubject(index) {
-            if (confirm('Видалити предмет?')) {
-                subjects.splice(index, 1);
-                saveData();
-                renderSettings();
-            }
-        }
-
-        function exportAllSchedules() {
-            const data = JSON.stringify(schedules);
-            const blob = new Blob([data], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'schedules.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function exportSelectedSchedule() {
-            const data = JSON.stringify([getCurrentSchedule()]);
-            const blob = new Blob([data], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'schedule.txt';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        function importSchedule() {
-            const file = document.getElementById('importFile').files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const imported = JSON.parse(e.target.result);
-                    schedules.push(...imported);
-                    saveData();
-                    renderAllSchedules();
-                };
-                reader.readAsText(file);
-            }
-        }
-
-        document.querySelector('.burger').addEventListener('click', toggleMenu);
-        document.getElementById('defaultDuration').addEventListener('change', (e) => {
-            settings.defaultDuration = parseInt(e.target.value);
-            saveData();
-        });
-        document.getElementById('defaultPairs').addEventListener('change', (e) => {
-            settings.defaultPairs = parseInt(e.target.value);
-            saveData();
-        });
-
-        setInterval(calculateLessonStatus, 60000);
-        calculateLessonStatus();
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
