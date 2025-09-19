@@ -11,73 +11,119 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Оверлей для затемнення фону при відкритому меню/модальному вікні -->
     <div id="overlay" class="hidden"></div>
 
-    <!-- Бічне меню -->
     <div class="burger">☰</div>
     <div class="menu" id="menu">
         <ul>
-            <li><a href="#" onclick="showSection('current')">Поточний розклад</a></li>
-            <li><a href="#" onclick="showSection('week')">Розклад на тиждень</a></li>
-            <li><a href="#" onclick="showSection('all')">Весь розклад</a></li>
+            <li><a href="#" onclick="showSection('current')">Головний екран</a></li>
+            <li><a href="#" onclick="showSection('dayView')">Розклад на день</a></li>
+            <li><a href="#" onclick="showSection('all')">Мої розклади</a></li>
             <li><a href="#" onclick="showSection('settings')">Налаштування</a></li>
         </ul>
     </div>
 
-    <!-- Основні секції -->
+    <!-- 1. Головний екран -->
     <div class="container" id="current">
-        <h1 id="currentLesson">Завантаження...</h1>
-        <p id="timeInfo"></p>
-        <p id="prevLesson" class="info"></p>
-        <p id="nextLesson" class="info"></p>
-        <button class="join-btn hidden" id="joinBtn">Приєднатись</button>
+        <div id="past-container">
+            <p id="prevLesson" class="info-subtle"></p>
+            <div id="completed-lessons-list"></div>
+        </div>
+        <div id="current-status-container">
+            <h1 id="currentLesson">Завантаження...</h1>
+            <p id="timeInfo"></p>
+            <button class="join-btn hidden" id="joinBtn">Приєднатись</button>
+        </div>
+        <div id="next-container">
+            <p id="nextLesson" class="info-subtle"></p>
+        </div>
     </div>
 
-    <div class="container hidden" id="week">
-        <h2>Розклад на тиждень</h2>
-        <div id="weekSchedule"></div>
+    <!-- 2. Перегляд розкладу на день -->
+    <div class="container hidden" id="dayView">
+        <div class="day-view-header">
+            <button onclick="navigateDay(-1)">&lt; Попередній</button>
+            <h2 id="dayViewTitle"></h2>
+            <button onclick="navigateDay(1)">Наступний &gt;</button>
+        </div>
+        <div id="dayViewSchedule"></div>
     </div>
 
+    <!-- 3. Управління розкладами -->
     <div class="container hidden" id="all">
-        <h2>Весь розклад</h2>
+        <h2>Мої розклади</h2>
         <div id="allSchedules"></div>
-        <button onclick="addNewSchedule()">Додати новий розклад</button>
+        <button onclick="openScheduleEditor()">Створити новий розклад</button>
+        <button onclick="openArchiveModal()">Архів розкладів</button>
     </div>
 
+    <!-- 4. Налаштування -->
     <div class="container hidden" id="settings">
         <h2>Налаштування</h2>
-        <h3>Налаштування уроків</h3>
-        <label>Тривалість пари (хв): <input type="number" id="defaultDuration" value="80"></label>
-        <label>Кількість пар: <input type="number" id="defaultPairs" value="5"></label>
-        <h3>Предмети</h3>
-        <div id="subjectsList"></div>
-        <input type="text" id="newSubject" placeholder="Новий предмет">
-        <input type="text" id="newSubjectLink" placeholder="Посилання">
-        <button onclick="addSubject()">Додати предмет</button>
-        <h3>Експорт/Імпорт</h3>
-        <button onclick="exportAllSchedules()">Експортувати всі</button>
-        <button onclick="exportSelectedSchedule()">Експортувати вибраний</button>
-        <input type="file" id="importFile" accept=".json">
-        <button onclick="importSchedule()">Імпортувати</button>
+        <div class="settings-section">
+            <h3>Поточний день</h3>
+            <p>Встановіть, який розклад та день є активним зараз.</p>
+            <select id="currentScheduleSelect"></select>
+            <select id="currentDaySelect"></select>
+            <button onclick="setCurrentState()">Зберегти поточний день</button>
+        </div>
+        <div class="settings-section">
+            <h3>Предмети</h3>
+            <div id="subjectsList"></div>
+            <input type="text" id="newSubject" placeholder="Новий предмет">
+            <input type="text" id="newSubjectLink" placeholder="Посилання">
+            <button onclick="addSubject()">Додати предмет</button>
+        </div>
+        <div class="settings-section">
+            <h3>Експорт / Імпорт</h3>
+            <button onclick="exportSchedules()">Експорт розкладів</button>
+            <button onclick="exportSubjects()">Експорт предметів</button>
+            <br>
+            <label>Імпорт розкладів: <input type="file" id="importSchedulesFile" accept=".json"></label>
+            <button onclick="importSchedules()">Імпортувати</button>
+            <br>
+            <label>Імпорт предметів: <input type="file" id="importSubjectsFile" accept=".json"></label>
+            <button onclick="importSubjects()">Імпортувати</button>
+        </div>
     </div>
 
-    <!-- Модальне вікно для додавання/редагування уроку -->
-    <div id="lessonModal" class="modal hidden">
+    <!-- Модальне вікно для редагування розкладу -->
+    <div id="scheduleEditorModal" class="modal hidden">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3 id="modalTitle">Додати урок</h3>
-            <form id="lessonForm">
-                <label for="lessonSubject">Предмет:</label>
-                <select id="lessonSubject" required></select>
-                <label for="lessonStartTime">Час початку:</label>
-                <input type="time" id="lessonStartTime" required>
-                <label for="lessonDuration">Тривалість (хв):</label>
-                <input type="number" id="lessonDuration" required>
-                <label for="lessonLink">Посилання:</label>
-                <input type="text" id="lessonLink" placeholder="Автоматично з предмету" readonly>
-                <button type="submit">Зберегти</button>
+            <span class="close-btn" onclick="closeScheduleEditor()">&times;</span>
+            <h3 id="scheduleEditorTitle">Редактор розкладу</h3>
+            <form id="scheduleForm">
+                <label for="scheduleName">Назва розкладу:</label>
+                <input type="text" id="scheduleName" required>
+                
+                <label for="scheduleType">Тип розкладу:</label>
+                <select id="scheduleType">
+                    <option value="permanent">Постійний (циклічний)</option>
+                    <option value="onetime">Одноразовий</option>
+                </select>
+                
+                <label for="scheduleDuration">Тривалість пари за замовчуванням (хв):</label>
+                <input type="number" id="scheduleDuration" value="80">
+
+                <h4>Часова сітка (початок пар)</h4>
+                <div id="timeGridContainer"></div>
+                <button type="button" onclick="addTimeToGrid()">+ Додати час</button>
+
+                <h4>Заповнення дня</h4>
+                <div class="day-tabs"></div>
+                <div id="lesson-editor-container"></div>
+
+                <button type="submit">Зберегти розклад</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Модальне вікно архіву -->
+    <div id="archiveModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeArchiveModal()">&times;</span>
+            <h3>Архів розкладів</h3>
+            <div id="archiveList"></div>
         </div>
     </div>
 
