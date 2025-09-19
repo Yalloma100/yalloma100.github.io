@@ -12,6 +12,7 @@
 </head>
 <body>
     <div id="overlay" class="hidden"></div>
+    <div id="live-clock"></div>
 
     <div class="burger">☰</div>
     <div class="menu" id="menu">
@@ -23,28 +24,20 @@
         </ul>
     </div>
 
-    <!-- 1. Головний екран -->
+    <!-- 1. Головний екран (контейнер заповнюється динамічно) -->
     <div class="container" id="current">
-        <div id="past-container">
-            <p id="prevLesson" class="info-subtle"></p>
-            <div id="completed-lessons-list"></div>
-        </div>
-        <div id="current-status-container">
-            <h1 id="currentLesson">Завантаження...</h1>
-            <p id="timeInfo"></p>
-            <button class="join-btn hidden" id="joinBtn">Приєднатись</button>
-        </div>
-        <div id="next-container">
-            <p id="nextLesson" class="info-subtle"></p>
-        </div>
     </div>
 
     <!-- 2. Перегляд розкладу на день -->
     <div class="container hidden" id="dayView">
         <div class="day-view-header">
-            <button onclick="navigateDay(-1)">&lt; Попередній</button>
+            <button class="nav-btn" onclick="navigateDay(-1)">‹</button>
             <h2 id="dayViewTitle"></h2>
-            <button onclick="navigateDay(1)">Наступний &gt;</button>
+            <button class="nav-btn" onclick="navigateDay(1)">›</button>
+        </div>
+        <div class="date-picker-container">
+            <label for="datePicker">Або оберіть точну дату:</label>
+            <input type="date" id="datePicker">
         </div>
         <div id="dayViewSchedule"></div>
     </div>
@@ -61,11 +54,13 @@
     <div class="container hidden" id="settings">
         <h2>Налаштування</h2>
         <div class="settings-section">
-            <h3>Поточний день</h3>
-            <p>Встановіть, який розклад та день є активним зараз.</p>
+            <h3>Поточний стан системи</h3>
+            <p>Вкажіть, з якого розкладу ("тижня") та дня почати відлік.</p>
+            <label>Активний розклад:</label>
             <select id="currentScheduleSelect"></select>
+            <label>Активний день:</label>
             <select id="currentDaySelect"></select>
-            <button onclick="setCurrentState()">Зберегти поточний день</button>
+            <button onclick="setCurrentState()">Зберегти стан</button>
         </div>
         <div class="settings-section">
             <h3>Предмети</h3>
@@ -76,14 +71,18 @@
         </div>
         <div class="settings-section">
             <h3>Експорт / Імпорт</h3>
-            <button onclick="exportSchedules()">Експорт розкладів</button>
-            <button onclick="exportSubjects()">Експорт предметів</button>
-            <br>
-            <label>Імпорт розкладів: <input type="file" id="importSchedulesFile" accept=".json"></label>
-            <button onclick="importSchedules()">Імпортувати</button>
-            <br>
-            <label>Імпорт предметів: <input type="file" id="importSubjectsFile" accept=".json"></label>
-            <button onclick="importSubjects()">Імпортувати</button>
+            <div class="import-export-grid">
+                <button onclick="exportSchedules()">Експорт розкладів</button>
+                <button onclick="exportSubjects()">Експорт предметів</button>
+                <div>
+                    <input type="file" id="importSchedulesFile" class="hidden-file-input" accept=".json">
+                    <button onclick="document.getElementById('importSchedulesFile').click()">Імпорт розкладів</button>
+                </div>
+                 <div>
+                    <input type="file" id="importSubjectsFile" class="hidden-file-input" accept=".json">
+                    <button onclick="document.getElementById('importSubjectsFile').click()">Імпорт предметів</button>
+                </div>
+            </div>
         </div>
     </div>
 
